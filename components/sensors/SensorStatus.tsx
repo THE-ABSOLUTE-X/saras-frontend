@@ -1,0 +1,122 @@
+"use client";
+
+interface Sensor {
+  name: string;
+  value: string;
+  status: "normal" | "warning" | "danger";
+}
+
+const sensors: Sensor[] = [
+  {
+    name: "Temperature",
+    value: "28.4 °C",
+    status: "normal",
+  },
+  {
+    name: "Distance",
+    value: "2.4 m",
+    status: "normal",
+  },
+  {
+    name: "Gas",
+    value: "Normal",
+    status: "normal",
+  },
+  {
+    name: "Flame",
+    value: "None",
+    status: "normal",
+  },
+  {
+    name: "GPS",
+    value: "Active",
+    status: "normal",
+  },
+  {
+    name: "Battery",
+    value: "82%",
+    status: "normal",
+  },
+];
+
+function getStatusStyle(status: Sensor["status"]) {
+  switch (status) {
+    case "danger":
+      return {
+        dot: "bg-red-500",
+        text: "text-red-400",
+      };
+
+    case "warning":
+      return {
+        dot: "bg-yellow-400",
+        text: "text-yellow-400",
+      };
+
+    default:
+      return {
+        dot: "bg-green-400",
+        text: "text-green-400",
+      };
+  }
+}
+
+export default function SensorStatus() {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+        <div>
+          <h3 className="font-semibold text-white">
+            Sensor Status
+          </h3>
+
+          <p className="mt-1 text-xs text-slate-500">
+            Current rover sensor readings
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-green-400">
+          <span className="h-2 w-2 rounded-full bg-green-400" />
+          Sensors Online
+        </div>
+      </div>
+
+      {/* Sensor Grid */}
+      <div className="grid grid-cols-1 gap-px bg-slate-800 sm:grid-cols-2 lg:grid-cols-3">
+        {sensors.map((sensor) => {
+          const style = getStatusStyle(sensor.status);
+
+          return (
+            <div
+              key={sensor.name}
+              className="bg-slate-900 px-5 py-4"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-500">
+                  {sensor.name}
+                </span>
+
+                <span
+                  className={`h-2 w-2 rounded-full ${style.dot}`}
+                />
+              </div>
+
+              <div className="mt-2 flex items-end justify-between">
+                <span className="text-lg font-semibold text-white">
+                  {sensor.value}
+                </span>
+
+                <span
+                  className={`text-[10px] uppercase tracking-wide ${style.text}`}
+                >
+                  {sensor.status}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
