@@ -41,6 +41,7 @@ export default function DashboardPage() {
   ultrasonicDistance: null as number | null,
   batteryLevel: null as number | null,
 });
+  const [operatorContact, setOperatorContact] = useState(false);
 
 useEffect(() => {
   const socket = new WebSocket(
@@ -53,6 +54,10 @@ useEffect(() => {
 
       if (message.type === "telemetry") {
         setTelemetry(message.data);
+      }
+
+      if (message.type === "operator_contact") {
+        setOperatorContact(true);
       }
     } catch (error) {
       console.error("Telemetry parse error:", error);
@@ -261,6 +266,30 @@ useEffect(() => {
           </header>
 
           {/* ================= PAGE CONTENT ================= */}
+          {operatorContact && (
+            <div className="border-b border-red-500/30 bg-red-500/10 px-4 py-3">
+              <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle size={18} className="text-red-400" />
+                  <div>
+                    <p className="text-sm font-semibold text-red-300">
+                      Operator contact requested
+                    </p>
+                    <p className="text-xs text-red-200/70">
+                      Netra has requested attention from Control Station 01.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setOperatorContact(false)}
+                  className="rounded-lg border border-red-400/30 px-3 py-1.5 text-xs text-red-200 hover:bg-red-500/10"
+                >
+                  Acknowledge
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="p-4 sm:p-6 lg:p-7">
 
             {/* Page heading */}
