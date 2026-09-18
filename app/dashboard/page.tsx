@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   Activity,
@@ -33,6 +33,40 @@ import ActivityLog from "@/components/logs/ActivityLog";
 export default function DashboardPage() {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [telemetry, setTelemetry] = useState({
+  temperature: null as number | null,
+  humidity: null as number | null,
+  gasLevel: null as number | null,
+  flameDetected: null as boolean | null,
+  ultrasonicDistance: null as number | null,
+  batteryLevel: null as number | null,
+});
+
+useEffect(() => {
+  const socket = new WebSocket(
+    "ws://localhost:8000/ws/robots/SARAS-01"
+  );
+
+  socket.onmessage = (event) => {
+    try {
+      const message = JSON.parse(event.data);
+
+      if (message.type === "telemetry") {
+        setTelemetry(message.data);
+      }
+    } catch (error) {
+      console.error("Telemetry parse error:", error);
+    }
+  };
+
+  socket.onerror = (error) => {
+    console.error("WebSocket error:", error);
+  };
+
+  return () => {
+    socket.close();
+  };
+}, []);
 
   const handleLogout = () => {
     router.push("/login");
@@ -438,7 +472,7 @@ export default function DashboardPage() {
 
             {/* ================= SENSOR TELEMETRY ================= */}
             <section className="mt-5">
-              <SensorStatus />
+              <SensorStatus telemetry={telemetry} />
             </section>
 
             {/* ================= ALERTS + MISSION ================= */}
