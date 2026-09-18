@@ -14,12 +14,43 @@ export default function RobotControl() {
   const [direction, setDirection] = useState<Direction>(null);
   const [speed, setSpeed] = useState(50);
 
-  const sendCommand = (command: Direction) => {
-    setDirection(command);
+  const sendCommand = async (command: Direction) => {
+  if (!command) return;
 
-    // Temporary frontend prototype
-    console.log("SARAS COMMAND:", command);
-  };
+  setDirection(command);
+
+  const commandMap = {
+    forward: "FORWARD",
+    backward: "BACKWARD",
+    left: "LEFT",
+    right: "RIGHT",
+    stop: "STOP",
+  } as const;
+
+  try {
+    const response = await fetch(
+      "http://localhost:8000/api/v1/robots/SARAS-01/command",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": "saras-dev-key",
+        },
+        body: JSON.stringify({
+          command: commandMap[command],
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Command failed: ${response.status}`);
+    }
+
+    console.log("SARAS COMMAND SENT:", commandMap[command]);
+  } catch (error) {
+    console.error("Failed to send SARAS command:", error);
+  }
+};
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "ArrowUp" || event.key.toLowerCase() === "w") {
