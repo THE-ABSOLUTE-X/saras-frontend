@@ -379,62 +379,87 @@ export default function DashboardPage() {
 
             </div>
 
-            {/* ================= CONTROL + STATE ================= */}
-            <div className="mt-5 grid gap-5 lg:grid-cols-2">
+            {/* ================= ROBOT CONTROL CENTER ================= */}
+            <section className="mt-5">
+              <div className="mb-3 flex items-end justify-between">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-400">
+                    Control Center
+                  </p>
 
-              <div>
-                <RobotControl />
+                  <h2 className="mt-1 text-lg font-semibold text-white">
+                    Robot Control
+                  </h2>
+
+                  <p className="mt-1 text-xs text-slate-500">
+                    Manual rover, head and arm control
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/5 px-3 py-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+                  <span className="text-[10px] font-semibold text-green-400">
+                    CONTROL READY
+                  </span>
+                </div>
               </div>
 
-              <section className="rounded-2xl border border-slate-800/80 bg-[#0B1222] p-5">
+              <RobotControl />
+            </section>
 
-                <div className="flex items-center justify-between border-b border-slate-800/70 pb-4">
+            {/* ================= ROBOT STATE ================= */}
+            <section className="mt-5 rounded-2xl border border-slate-800/80 bg-[#0B1222] p-5">
 
-                  <div>
-                    <p className="text-sm font-semibold">
-                      Robot State
-                    </p>
+              <div className="flex items-center justify-between border-b border-slate-800/70 pb-4">
 
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Current rover operating state
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">
+                    Robot State
+                  </p>
 
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-400/10">
-                    <Bot size={18} className="text-cyan-400" />
-                  </div>
-
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Current rover operating state
+                  </p>
                 </div>
 
-                <div className="mt-5 space-y-1">
-
-                  <InfoRow
-                    label="Current Command"
-                    value="STOP"
-                  />
-
-                  <InfoRow
-                    label="Mission"
-                    value="No active mission"
-                  />
-
-                  <InfoRow
-                    label="Control"
-                    value="Available"
-                    valueClass="text-green-400"
-                  />
-
-                  <InfoRow
-                    label="Connection"
-                    value="Stable"
-                    valueClass="text-green-400"
-                  />
-
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-400/10">
+                  <Bot size={18} className="text-cyan-400" />
                 </div>
 
-              </section>
+              </div>
 
-            </div>
+              <div className="mt-2 grid gap-x-8 md:grid-cols-2">
+
+                <InfoRow
+                  label="Current Command"
+                  value="STOP"
+                />
+
+                <InfoRow
+                  label="Mission"
+                  value="No active mission"
+                />
+
+                <InfoRow
+                  label="Control"
+                  value="Available"
+                  valueClass="text-green-400"
+                />
+
+                <InfoRow
+                  label="Connection"
+                  value="Stable"
+                  valueClass="text-green-400"
+                />
+
+              </div>
+            </section>
+
+
+
+
+
+
 
             {/* ================= SENSOR TELEMETRY ================= */}
             <section className="mt-5">
@@ -542,11 +567,10 @@ function NavigationItem({
 }) {
   return (
     <button
-      className={`group mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
-        active
-          ? "bg-cyan-400/10 text-cyan-400 ring-1 ring-cyan-400/10"
-          : "text-slate-500 hover:bg-slate-800/60 hover:text-slate-200"
-      }`}
+      className={`group mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${active
+        ? "bg-cyan-400/10 text-cyan-400 ring-1 ring-cyan-400/10"
+        : "text-slate-500 hover:bg-slate-800/60 hover:text-slate-200"
+        }`}
     >
       <span
         className={
@@ -601,11 +625,10 @@ function StatusCard({
         </div>
 
         <span
-          className={`h-1.5 w-1.5 rounded-full ${
-            statusType === "success"
-              ? "bg-green-400"
-              : "bg-slate-600"
-          }`}
+          className={`h-1.5 w-1.5 rounded-full ${statusType === "success"
+            ? "bg-green-400"
+            : "bg-slate-600"
+            }`}
         />
 
       </div>
