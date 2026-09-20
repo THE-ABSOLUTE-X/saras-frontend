@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   Activity,
@@ -33,6 +33,45 @@ import ActivityLog from "@/components/logs/ActivityLog";
 export default function DashboardPage() {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [telemetry, setTelemetry] = useState({
+  temperature: null as number | null,
+  humidity: null as number | null,
+  gasLevel: null as number | null,
+  flameDetected: null as boolean | null,
+  ultrasonicDistance: null as number | null,
+  batteryLevel: null as number | null,
+});
+  const [operatorContact, setOperatorContact] = useState(false);
+
+useEffect(() => {
+  const socket = new WebSocket(
+    "ws://localhost:8000/ws/robots/SARAS-01"
+  );
+
+  socket.onmessage = (event) => {
+    try {
+      const message = JSON.parse(event.data);
+
+      if (message.type === "telemetry") {
+        setTelemetry(message.data);
+      }
+
+      if (message.type === "operator_contact") {
+        setOperatorContact(true);
+      }
+    } catch (error) {
+      console.error("Telemetry parse error:", error);
+    }
+  };
+
+  socket.onerror = (error) => {
+    console.error("WebSocket error:", error);
+  };
+
+  return () => {
+    socket.close();
+  };
+}, []);
 
   const handleLogout = () => {
     router.push("/login");
@@ -227,6 +266,30 @@ export default function DashboardPage() {
           </header>
 
           {/* ================= PAGE CONTENT ================= */}
+          {operatorContact && (
+            <div className="border-b border-red-500/30 bg-red-500/10 px-4 py-3">
+              <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle size={18} className="text-red-400" />
+                  <div>
+                    <p className="text-sm font-semibold text-red-300">
+                      Operator contact requested
+                    </p>
+                    <p className="text-xs text-red-200/70">
+                      Netra has requested attention from Control Station 01.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setOperatorContact(false)}
+                  className="rounded-lg border border-red-400/30 px-3 py-1.5 text-xs text-red-200 hover:bg-red-500/10"
+                >
+                  Acknowledge
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="p-4 sm:p-6 lg:p-7">
 
             {/* Page heading */}
@@ -463,7 +526,7 @@ export default function DashboardPage() {
 
             {/* ================= SENSOR TELEMETRY ================= */}
             <section className="mt-5">
-              <SensorStatus />
+              <SensorStatus telemetry={telemetry} />
             </section>
 
             {/* ================= ALERTS + MISSION ================= */}
