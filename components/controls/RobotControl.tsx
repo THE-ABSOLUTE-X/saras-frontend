@@ -550,6 +550,7 @@ export default function RobotControl() {
             >
               ✋ OPEN
             </button>
+        
 
             <button
               type="button"
