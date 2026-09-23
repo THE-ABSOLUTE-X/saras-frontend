@@ -16,7 +16,11 @@ type ArmPosition = "Up" | "Down" | "Left" | "Right" | "Center";
 
 type Gripper = "Open" | "Closed";
 
-export default function RobotControl() {
+export interface RobotControlProps {
+  isOnline?: boolean;
+}
+
+export default function RobotControl({ isOnline = false }: RobotControlProps) {
   const [direction, setDirection] = useState<Direction>(null);
   const [speed, setSpeed] = useState(50);
 
@@ -143,11 +147,21 @@ export default function RobotControl() {
           </h3>
         </div>
 
-        <div className="flex w-fit items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/5 px-3 py-2">
-          <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+        <div
+          className={`flex w-fit items-center gap-2 rounded-lg border px-3 py-2 ${
+            isOnline
+              ? "border-green-500/20 bg-green-500/5 text-green-400"
+              : "border-slate-800 bg-slate-900/60 text-slate-500"
+          }`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              isOnline ? "bg-green-400" : "bg-slate-600"
+            }`}
+          />
 
-          <span className="text-[10px] font-semibold text-green-400">
-            CONTROL READY
+          <span className="text-[10px] font-semibold">
+            {isOnline ? "CONTROL READY" : "CONTROL N/A"}
           </span>
         </div>
 

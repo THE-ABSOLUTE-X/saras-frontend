@@ -1,16 +1,9 @@
 "use client";
 
-interface Telemetry {
-  temperature: number | null;
-  humidity: number | null;
-  gasLevel: number | null;
-  flameDetected: boolean | null;
-  ultrasonicDistance: number | null;
-  batteryLevel: number | null;
-}
+import type { TelemetryData } from "@/types/telemetry";
 
 interface SensorStatusProps {
-  telemetry: Telemetry;
+  telemetry: TelemetryData;
 }
 
 interface Sensor {
@@ -22,12 +15,26 @@ interface Sensor {
 export default function SensorStatus({
   telemetry,
 }: SensorStatusProps) {
+  const hasGps =
+    telemetry.latitude !== null &&
+    telemetry.longitude !== null &&
+    Number.isFinite(telemetry.latitude) &&
+    Number.isFinite(telemetry.longitude);
+
   const sensors: Sensor[] = [
     {
       name: "Temperature",
       value:
         telemetry.temperature !== null
           ? `${telemetry.temperature.toFixed(1)} °C`
+          : "--",
+      status: "normal",
+    },
+    {
+      name: "Humidity",
+      value:
+        telemetry.humidity !== null
+          ? `${telemetry.humidity.toFixed(1)} %`
           : "--",
       status: "normal",
     },
@@ -62,8 +69,10 @@ export default function SensorStatus({
     },
     {
       name: "GPS",
-      value: "Backend telemetry",
-      status: "normal",
+      value: hasGps
+        ? `${telemetry.latitude?.toFixed(4)}, ${telemetry.longitude?.toFixed(4)}`
+        : "Unavailable",
+      status: hasGps ? "normal" : "warning",
     },
     {
       name: "Battery",
@@ -72,10 +81,13 @@ export default function SensorStatus({
           ? `${telemetry.batteryLevel.toFixed(0)}%`
           : "--",
       status:
-        telemetry.batteryLevel !== null &&
-        telemetry.batteryLevel < 20
+        telemetry.batteryLevel === null
           ? "warning"
-          : "normal",
+          : telemetry.batteryLevel <= 20
+            ? "danger"
+            : telemetry.batteryLevel <= 50
+              ? "warning"
+              : "normal",
     },
   ];
 

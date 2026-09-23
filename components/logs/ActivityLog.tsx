@@ -1,45 +1,30 @@
 "use client";
 
-import { useState } from "react";
+export type LogType = "info" | "success" | "warning" | "error";
 
-type LogType = "info" | "success" | "warning" | "error";
-
-interface LogEntry {
-  id: number;
+export interface LogEntry {
+  id: string | number;
   time: string;
   message: string;
   type: LogType;
 }
 
-const initialLogs: LogEntry[] = [
+const fallbackLogs: LogEntry[] = [
   {
-    id: 1,
-    time: "14:32:10",
-    message: "Rover started",
-    type: "success",
-  },
-  {
-    id: 2,
-    time: "14:31:45",
-    message: "GPS signal acquired",
-    type: "success",
-  },
-  {
-    id: 3,
-    time: "14:30:22",
-    message: "Mission initialized",
+    id: "f-1",
+    time: "--:--:--",
+    message: "System initialized. Waiting for rover session events...",
     type: "info",
-  },
-  {
-    id: 4,
-    time: "14:29:58",
-    message: "SARAS-01 connected",
-    type: "success",
   },
 ];
 
-export default function ActivityLog() {
-  const [logs] = useState<LogEntry[]>(initialLogs);
+export interface ActivityLogProps {
+  logs?: LogEntry[];
+}
+
+export default function ActivityLog({ logs }: ActivityLogProps) {
+  const displayLogs = logs && logs.length > 0 ? logs : fallbackLogs;
+  const isLive = Boolean(logs && logs.length > 0);
 
   const getTypeClass = (type: LogType) => {
     switch (type) {
@@ -56,27 +41,27 @@ export default function ActivityLog() {
 
   return (
     <section className="mt-6 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
-      
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
         <div>
-          <h3 className="font-semibold text-white">
-            Activity Log
-          </h3>
-
+          <h3 className="font-semibold text-white">Activity Log</h3>
           <p className="mt-1 text-xs text-slate-500">
-            Recent system and rover activity
+            Real-time system and mission activity events
           </p>
         </div>
 
-        <span className="text-xs text-green-400">
-          LIVE
+        <span
+          className={`text-xs font-semibold ${
+            isLive ? "text-green-400" : "text-slate-500"
+          }`}
+        >
+          {isLive ? "LIVE SESSION" : "STANDBY"}
         </span>
       </div>
 
       {/* Log entries */}
       <div className="max-h-64 overflow-y-auto">
-        {logs.map((log) => (
+        {displayLogs.map((log) => (
           <div
             key={log.id}
             className="flex items-center gap-4 border-b border-slate-800/70 px-5 py-3 last:border-b-0"
@@ -94,9 +79,7 @@ export default function ActivityLog() {
             />
 
             {/* Message */}
-            <span className="text-sm text-slate-300">
-              {log.message}
-            </span>
+            <span className="text-sm text-slate-300">{log.message}</span>
 
             {/* Type */}
             <span
@@ -111,4 +94,4 @@ export default function ActivityLog() {
       </div>
     </section>
   );
-}   
+}

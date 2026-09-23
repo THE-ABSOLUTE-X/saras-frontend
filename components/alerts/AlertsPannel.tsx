@@ -1,32 +1,85 @@
 "use client";
 
 import { useState } from "react";
+import type { TelemetryData } from "@/types/telemetry";
 
 type AlertType = "danger" | "warning" | "normal";
 
 interface AlertItem {
-  id: number;
+  id: string;
   type: AlertType;
   title: string;
   message: string;
   time: string;
 }
 
-const initialAlerts: AlertItem[] = [
-  {
-    id: 1,
-    type: "normal",
-    title: "System Normal",
-    message: "No active emergency detected",
-    time: "Now",
-  },
-];
+export interface AlertsPanelProps {
+  telemetry?: TelemetryData | null;
+  wsConnected?: boolean;
+}
 
-export default function AlertsPanel() {
-  const [alerts, setAlerts] = useState<AlertItem[]>(initialAlerts);
+export default function AlertsPanel({
+  telemetry,
+  wsConnected = true,
+}: AlertsPanelProps) {
+  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+
+  // Construct active alerts dynamically from live telemetry
+  const activeAlerts: AlertItem[] = [];
+
+  if (telemetry?.flameDetected === true) {
+    activeAlerts.push({
+      id: "flame-detected",
+      type: "danger",
+      title: "Flame / Fire Detected",
+      message: "Optical flame sensor triggered emergency condition.",
+      time: "Live",
+    });
+  }
+
+  if (wsConnected === false) {
+    activeAlerts.push({
+      id: "ws-disconnected",
+      type: "warning",
+      title: "Control Station Offline",
+      message: "WebSocket connection to SARAS backend is currently disconnected.",
+      time: "Live",
+    });
+  } else if (telemetry && telemetry.robotConnected === false) {
+    activeAlerts.push({
+      id: "robot-disconnected",
+      type: "warning",
+      title: "SARAS-01 Disconnected",
+      message: "Rover telemetry reports robot is currently offline.",
+      time: "Live",
+    });
+  }
+
+  if (telemetry?.robotStatus === "warning") {
+    activeAlerts.push({
+      id: "robot-status-warning",
+      type: "warning",
+      title: "Rover Status: Warning",
+      message: "Rover reported warning operating state.",
+      time: "Live",
+    });
+  } else if (telemetry?.robotStatus === "offline") {
+    activeAlerts.push({
+      id: "robot-status-offline",
+      type: "danger",
+      title: "Rover Status: Offline",
+      message: "Rover operating state transitioned to offline.",
+      time: "Live",
+    });
+  }
+
+  // Filter out any dismissed alerts
+  const visibleAlerts = activeAlerts.filter(
+    (alert) => !dismissedIds.includes(alert.id)
+  );
 
   const clearAlerts = () => {
-    setAlerts([]);
+    setDismissedIds(activeAlerts.map((a) => a.id));
   };
 
   const getAlertStyle = (type: AlertType) => {
@@ -49,12 +102,15 @@ export default function AlertsPanel() {
     }
 
     return {
-      container: "border-green-900/60 bg-green-950/20",
-      icon: "bg-green-400",
-      title: "text-green-400",
-      message: "text-green-300/80",
+      container: "border-slate-800 bg-slate-950/40",
+      icon: "bg-cyan-400",
+      title: "text-slate-300",
+      message: "text-slate-400",
     };
   };
+
+  const hasDanger = visibleAlerts.some((a) => a.type === "danger");
+  const hasWarning = visibleAlerts.some((a) => a.type === "warning");
 
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
@@ -73,50 +129,50 @@ export default function AlertsPanel() {
         <div className="flex items-center gap-2 text-xs">
           <span
             className={`h-2 w-2 rounded-full ${
-              alerts.some((alert) => alert.type === "danger")
-                ? "bg-red-500"
-                : alerts.some((alert) => alert.type === "warning")
+              hasDanger
+                ? "bg-red-500 animate-pulse"
+                : hasWarning
                   ? "bg-yellow-400"
-                  : "bg-green-400"
+                  : "bg-cyan-400"
             }`}
           />
 
           <span
             className={
-              alerts.some((alert) => alert.type === "danger")
-                ? "text-red-400"
-                : alerts.some((alert) => alert.type === "warning")
-                  ? "text-yellow-400"
-                  : "text-green-400"
+              hasDanger
+                ? "text-red-400 font-semibold"
+                : hasWarning
+                  ? "text-yellow-400 font-semibold"
+                  : "text-cyan-400"
             }
           >
-            {alerts.some((alert) => alert.type === "danger")
+            {hasDanger
               ? "Emergency"
-              : alerts.some((alert) => alert.type === "warning")
+              : hasWarning
                 ? "Warning"
-                : "All Clear"}
+                : "Monitoring Active"}
           </span>
         </div>
       </div>
 
-      {/* Alerts */}
+      {/* Alerts Content */}
       <div className="space-y-3 p-5">
-        {alerts.length === 0 ? (
-          <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-8 text-center">
-            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-green-500/10">
-              <span className="text-lg text-green-400">✓</span>
+        {visibleAlerts.length === 0 ? (
+          <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-4">
+            <div className="flex items-start gap-3">
+              <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-cyan-400" />
+              <div>
+                <p className="text-sm font-semibold text-slate-300">
+                  System Monitoring
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Monitoring active — no alert data available
+                </p>
+              </div>
             </div>
-
-            <p className="text-sm font-medium text-green-400">
-              No Active Alerts
-            </p>
-
-            <p className="mt-1 text-xs text-slate-500">
-              SARAS systems are operating normally.
-            </p>
           </div>
         ) : (
-          alerts.map((alert) => {
+          visibleAlerts.map((alert) => {
             const style = getAlertStyle(alert.type);
 
             return (
@@ -125,28 +181,22 @@ export default function AlertsPanel() {
                 className={`rounded-xl border p-4 ${style.container}`}
               >
                 <div className="flex items-start gap-3">
-                  {/* Status indicator */}
                   <span
                     className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${style.icon}`}
                   />
 
-                  {/* Alert content */}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-3">
-                      <p
-                        className={`text-sm font-semibold ${style.title}`}
-                      >
+                      <p className={`text-sm font-semibold ${style.title}`}>
                         {alert.title}
                       </p>
 
-                      <span className="shrink-0 text-[10px] text-slate-500">
+                      <span className="shrink-0 text-[10px] text-slate-500 font-mono">
                         {alert.time}
                       </span>
                     </div>
 
-                    <p
-                      className={`mt-1 text-xs ${style.message}`}
-                    >
+                    <p className={`mt-1 text-xs ${style.message}`}>
                       {alert.message}
                     </p>
                   </div>
@@ -156,8 +206,7 @@ export default function AlertsPanel() {
           })
         )}
 
-        {/* Clear button */}
-        {alerts.length > 0 && (
+        {visibleAlerts.length > 0 && (
           <button
             type="button"
             onClick={clearAlerts}
