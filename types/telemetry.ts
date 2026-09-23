@@ -19,6 +19,17 @@ export interface TelemetryData {
   robotConnected: boolean | null;
   robotStatus: RobotStatus | string | null;
   sequence: number | null;
+  mq7Digital?: number | null;
+  objectDetected?: boolean | null;
+  accelerometerX?: number | null;
+  accelerometerY?: number | null;
+  accelerometerZ?: number | null;
+  gyroscopeX?: number | null;
+  gyroscopeY?: number | null;
+  gyroscopeZ?: number | null;
+  roll?: number | null;
+  pitch?: number | null;
+  mpuTemperature?: number | null;
 }
 
 export interface WebSocketTelemetryMessage {

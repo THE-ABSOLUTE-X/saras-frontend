@@ -75,6 +75,8 @@ export default function DashboardPage() {
   const [wsConnected, setWsConnected] = useState(false);
   const [activityLogs, setActivityLogs] = useState<LogEntry[]>([]);
   const [operatorContact, setOperatorContact] = useState(false);
+  const [phoneTelemetry, setPhoneTelemetry] = useState<Record<string, unknown>>({});
+  const [videoFrame, setVideoFrame] = useState<string | null>(null);
   const [searchArea, setSearchArea] = useState<SearchAreaInfo | null>(null);
   const [submissionStatus, setSubmissionStatus] =
     useState<MissionSubmissionStatus>("NOT_SELECTED");
@@ -338,13 +340,10 @@ export default function DashboardPage() {
             } else if (message.type === "operator_contact") {
               setOperatorContact(true);
               addLog("Emergency operator contact requested by Netra", "warning");
-            } else if (message.type === "phone_telemetry" && message.data) {
-              setTelemetry((prev) => ({
-                ...prev,
-                ...message.data,
-              }));
+            } else if (message.type === "phone_telemetry") {
+              setPhoneTelemetry((message.data as Record<string, unknown>) ?? {});
             } else if (message.type === "video_frame") {
-              // Future camera stream frame handling
+              setVideoFrame((message.data?.jpegBase64 as string) ?? null);
             }
           } catch (error) {
             console.warn("Telemetry parse warning:", error);
@@ -1056,6 +1055,108 @@ export default function DashboardPage() {
                 />
 
               </div>
+            </section>
+
+            {/* ================= NETRA LIVE FEED ================= */}
+            <section className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
+              <section className="overflow-hidden rounded-2xl border border-slate-800/80 bg-[#0B1222]">
+                <div className="flex items-center justify-between border-b border-slate-800/70 px-5 py-4">
+                  <div>
+                    <p className="text-sm font-semibold">Netra Live Camera</p>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Live video transmitted from the phone
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-green-400">
+                    <span className="h-2 w-2 rounded-full bg-green-400" />
+                    {videoFrame ? "LIVE" : "WAITING"}
+                  </div>
+                </div>
+                <div className="flex min-h-[320px] items-center justify-center bg-black p-2">
+                  {videoFrame ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={`data:image/jpeg;base64,${videoFrame}`}
+                      alt="Netra live camera"
+                      className="max-h-[520px] w-full object-contain"
+                    />
+                  ) : (
+                    <div className="text-sm text-slate-600">
+                      Waiting for Netra camera stream...
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-slate-800/80 bg-[#0B1222] p-5">
+                <div className="flex items-center justify-between border-b border-slate-800/70 pb-4">
+                  <div>
+                    <p className="text-sm font-semibold">Netra Phone Telemetry</p>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      GPS, IMU, orientation and detection
+                    </p>
+                  </div>
+                  <span className="h-2 w-2 rounded-full bg-green-400" />
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                  {[
+                    [
+                      "GPS",
+                      phoneTelemetry.latitude != null &&
+                      phoneTelemetry.longitude != null
+                        ? `${phoneTelemetry.latitude}, ${phoneTelemetry.longitude}`
+                        : "--",
+                    ],
+                    [
+                      "Person",
+                      phoneTelemetry.personDetected
+                        ? `Detected (${phoneTelemetry.personCount != null ? String(phoneTelemetry.personCount) : "0"})`
+                        : "None",
+                    ],
+                    ["Heading", String(phoneTelemetry.heading ?? "--")],
+                    ["Pitch", String(phoneTelemetry.pitch ?? "--")],
+                    ["Roll", String(phoneTelemetry.roll ?? "--")],
+                    [
+                      "Orientation",
+                      String(phoneTelemetry.deviceOrientation ?? "--"),
+                    ],
+                    [
+                      "Accelerometer",
+                      String(phoneTelemetry.accelerometer ?? "--"),
+                    ],
+                    ["Gyroscope", String(phoneTelemetry.gyroscope ?? "--")],
+                    [
+                      "Magnetometer",
+                      String(phoneTelemetry.magnetometer ?? "--"),
+                    ],
+                    [
+                      "Camera",
+                      phoneTelemetry.cameraAvailable
+                        ? "Available"
+                        : "Unavailable",
+                    ],
+                    [
+                      "Microphone",
+                      phoneTelemetry.microphoneAvailable
+                        ? "Available"
+                        : "Unavailable",
+                    ],
+                  ].map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="rounded-xl border border-slate-800 bg-[#070C18] p-3"
+                    >
+                      <p className="text-[9px] uppercase tracking-wider text-slate-600">
+                        {label}
+                      </p>
+                      <p className="mt-2 break-words text-slate-200">
+                        {value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
             </section>
 
             {/* ================= SENSOR TELEMETRY ================= */}

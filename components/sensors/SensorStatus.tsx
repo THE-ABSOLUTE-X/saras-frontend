@@ -89,6 +89,54 @@ export default function SensorStatus({
               ? "warning"
               : "normal",
     },
+    {
+      name: "MQ-7 Digital",
+      value:
+        telemetry.mq7Digital != null ? String(telemetry.mq7Digital) : "--",
+      status: "normal",
+    },
+    {
+      name: "Object",
+      value:
+        telemetry.objectDetected == null
+          ? "--"
+          : telemetry.objectDetected
+            ? "Detected"
+            : "None",
+      status: "normal",
+    },
+    {
+      name: "Robot Accel",
+      value:
+        telemetry.accelerometerX != null
+          ? `X ${telemetry.accelerometerX.toFixed(2)} Y ${(telemetry.accelerometerY ?? 0).toFixed(2)} Z ${(telemetry.accelerometerZ ?? 0).toFixed(2)}`
+          : "--",
+      status: "normal",
+    },
+    {
+      name: "Robot Gyro",
+      value:
+        telemetry.gyroscopeX != null
+          ? `X ${telemetry.gyroscopeX.toFixed(2)} Y ${(telemetry.gyroscopeY ?? 0).toFixed(2)} Z ${(telemetry.gyroscopeZ ?? 0).toFixed(2)}`
+          : "--",
+      status: "normal",
+    },
+    {
+      name: "Robot Roll/Pitch",
+      value:
+        telemetry.roll != null || telemetry.pitch != null
+          ? `R ${String(telemetry.roll ?? "--")} / P ${String(telemetry.pitch ?? "--")}`
+          : "--",
+      status: "normal",
+    },
+    {
+      name: "MPU Temp",
+      value:
+        telemetry.mpuTemperature != null
+          ? `${telemetry.mpuTemperature.toFixed(1)} °C`
+          : "--",
+      status: "normal",
+    },
   ];
 
   function getStatusStyle(status: Sensor["status"]) {
