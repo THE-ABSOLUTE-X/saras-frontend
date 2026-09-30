@@ -31,7 +31,11 @@ export default function RealtimeManager() {
         if (!isMountedRef.current || !data) return;
 
         if (data.phoneTelemetry && typeof data.phoneTelemetry === "object") {
-          setPhoneTelemetry(data.phoneTelemetry as Partial<PhoneTelemetryData>);
+          const pt = data.phoneTelemetry as Partial<PhoneTelemetryData>;
+          setPhoneTelemetry({
+            ...pt,
+            timestamp: pt.timestamp || new Date().toISOString(),
+          });
         }
 
         if (data.telemetry && typeof data.telemetry === "object") {
@@ -82,9 +86,22 @@ export default function RealtimeManager() {
             } else if (message.type === "telemetry" && message.data) {
               setTelemetry(message.data as Partial<TelemetryData>);
             } else if (message.type === "phone_telemetry") {
-              setPhoneTelemetry(
-                (message.data as Partial<PhoneTelemetryData>) ?? {}
-              );
+              const rawData = (message.data as Partial<PhoneTelemetryData>) ?? {};
+              const ts =
+                (message.timestamp as string) ||
+                (rawData.timestamp as string) ||
+                new Date().toISOString();
+              setPhoneTelemetry({
+                ...rawData,
+                timestamp: ts,
+              });
+
+              if (rawData.personDetected) {
+                addLog(
+                  `Netra reconnaissance: Human presence detected (${rawData.personCount ?? 1} person)`,
+                  "warning"
+                );
+              }
             } else if (message.type === "video_frame") {
               setVideoFrame((message.data?.jpegBase64 as string) ?? null);
             } else if (message.type === "operator_contact") {

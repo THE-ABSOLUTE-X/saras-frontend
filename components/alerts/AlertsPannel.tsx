@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { TelemetryData } from "@/types/telemetry";
+import type { TelemetryData, PhoneTelemetryData } from "@/types/telemetry";
 
 type AlertType = "danger" | "warning" | "normal";
 
@@ -15,17 +15,35 @@ interface AlertItem {
 
 export interface AlertsPanelProps {
   telemetry?: TelemetryData | null;
+  phoneTelemetry?: PhoneTelemetryData | null;
   wsConnected?: boolean;
 }
 
 export default function AlertsPanel({
   telemetry,
+  phoneTelemetry,
   wsConnected = true,
 }: AlertsPanelProps) {
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
 
   // Construct active alerts dynamically from live telemetry
   const activeAlerts: AlertItem[] = [];
+
+  if (phoneTelemetry?.personDetected === true) {
+    activeAlerts.push({
+      id: "netra-person-detected",
+      type: "danger",
+      title: "Human Presence Detected",
+      message: `Netra reconnaissance node identified ${
+        phoneTelemetry.personCount !== null && phoneTelemetry.personCount !== undefined
+          ? phoneTelemetry.personCount
+          : 1
+      } person(s).`,
+      time: phoneTelemetry.timestamp
+        ? new Date(phoneTelemetry.timestamp).toLocaleTimeString()
+        : "Live",
+    });
+  }
 
   if (telemetry?.flameDetected === true) {
     activeAlerts.push({

@@ -108,12 +108,21 @@ export interface PhoneTelemetryData {
   batteryStatus?: string | null;
   networkType?: string | null;
   signalStrength?: number | null;
-  heading?: number | null;
+  heading?: number | string | null;
+  pitch?: number | string | null;
+  roll?: number | string | null;
+  deviceOrientation?: string | null;
   speed?: number | null;
   deviceModel?: string | null;
   timestamp?: string | null;
   personDetected?: boolean | null;
+  personCount?: number | null;
   confidence?: number | null;
+  cameraAvailable?: boolean | null;
+  microphoneAvailable?: boolean | null;
+  accelerometer?: string | { x: number; y: number; z: number } | null;
+  gyroscope?: string | { x: number; y: number; z: number } | null;
+  magnetometer?: string | { x: number; y: number; z: number } | null;
   [key: string]: unknown;
 }
 

@@ -336,7 +336,11 @@ export default function DashboardPage() {
         {/* Bottom Section: Sensors Summary, Alerts, and Activity Log */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <SensorStatus telemetry={telemetry} />
-          <AlertsPanel telemetry={telemetry} wsConnected={wsConnected} />
+          <AlertsPanel
+            telemetry={telemetry}
+            phoneTelemetry={phoneTelemetry}
+            wsConnected={wsConnected}
+          />
         </div>
 
         {/* Activity Log */}
