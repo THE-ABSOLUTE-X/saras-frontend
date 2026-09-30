@@ -1,10 +1,14 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
+import "@watergis/maplibre-gl-terradraw/dist/maplibre-gl-terradraw.css";
 import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
-import { distance, area, polygon } from "@turf/turf";
+import { distance, area } from "@turf/turf";
 import { SquareDashed, Trash2, CheckCircle2 } from "lucide-react";
+import { MaplibreTerradrawControl } from "@watergis/maplibre-gl-terradraw";
+import { TerraDrawRectangleMode, TerraDrawSelectMode } from "terra-draw";
+import type { Feature, Polygon } from "geojson";
 
 export interface SearchAreaBoundaryPoint {
   latitude: number;
@@ -33,34 +37,65 @@ export interface SarasMapProps {
   onSearchAreaSelect?: (area: SearchAreaInfo | null) => void;
 }
 
-const SOURCE_ID = "saras-search-area-source";
-const LAYER_FILL_ID = "saras-search-area-fill";
-const LAYER_STROKE_ID = "saras-search-area-stroke";
+function parseSearchAreaFromFeature(feature: Feature): SearchAreaInfo | null {
+  if (!feature || feature.geometry.type !== "Polygon") return null;
+  const poly = feature.geometry as Polygon;
+  const ring = poly.coordinates[0];
+  if (!ring || ring.length < 4) return null;
 
-function buildRectanglePolygon(
-  p1: { lng: number; lat: number },
-  p2: { lng: number; lat: number }
-) {
-  const south = Math.min(p1.lat, p2.lat);
-  const north = Math.max(p1.lat, p2.lat);
-  const west = Math.min(p1.lng, p2.lng);
-  const east = Math.max(p1.lng, p2.lng);
+  const lats = ring.map((p) => p[1]);
+  const lngs = ring.map((p) => p[0]);
+  const south = Math.min(...lats);
+  const north = Math.max(...lats);
+  const west = Math.min(...lngs);
+  const east = Math.max(...lngs);
+
+  // Structure: [south-west, south-east, north-east, north-west]
+  const boundary: [
+    SearchAreaBoundaryPoint,
+    SearchAreaBoundaryPoint,
+    SearchAreaBoundaryPoint,
+    SearchAreaBoundaryPoint
+  ] = [
+    { latitude: south, longitude: west },
+    { latitude: south, longitude: east },
+    { latitude: north, longitude: east },
+    { latitude: north, longitude: west },
+  ];
+
+  const widthM = distance([west, south], [east, south], { units: "meters" });
+  const heightM = distance([west, south], [west, north], { units: "meters" });
+  const areaM2 = area(feature);
+
+  if (widthM < 0.5 || heightM < 0.5) return null;
 
   return {
-    south,
+    boundary,
     north,
-    west,
+    south,
     east,
-    coordinates: [
-      [
-        [west, south],
-        [east, south],
-        [east, north],
-        [west, north],
-        [west, south],
-      ] as [number, number][],
-    ],
+    west,
+    widthMeters: Math.round(widthM * 100) / 100,
+    heightMeters: Math.round(heightM * 100) / 100,
+    areaSquareMeters: Math.round(areaM2 * 100) / 100,
   };
+}
+
+function applyTerraDrawLayerStyles(m: maplibregl.Map | null) {
+  if (!m) return;
+  try {
+    if (m.getLayer("td-polygon")) {
+      m.setPaintProperty("td-polygon", "fill-color", "#ef4444");
+      m.setPaintProperty("td-polygon", "fill-opacity", 0.22);
+    }
+    if (m.getLayer("td-polygon-outline")) {
+      m.setPaintProperty("td-polygon-outline", "line-color", "#dc2626");
+      m.setPaintProperty("td-polygon-outline", "line-width", 3);
+      m.setPaintProperty("td-polygon-outline", "line-opacity", 1);
+    }
+  } catch {
+    // Ignore if style is reloading
+  }
 }
 
 export default function SarasMap({
@@ -71,45 +106,22 @@ export default function SarasMap({
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const marker = useRef<maplibregl.Marker | null>(null);
+  const drawControlRef = useRef<MaplibreTerradrawControl | null>(null);
 
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedArea, setSelectedArea] = useState<SearchAreaInfo | null>(null);
 
   const isSelectingRef = useRef(false);
-  const isDraggingRef = useRef(false);
-  const dragStartLngLatRef = useRef<maplibregl.LngLat | null>(null);
-  const dragStartPointRef = useRef<maplibregl.Point | null>(null);
-  const lastMoveLngLatRef = useRef<maplibregl.LngLat | null>(null);
-  const lastMovePointRef = useRef<maplibregl.Point | null>(null);
-  const selectedAreaRef = useRef<SearchAreaInfo | null>(null);
   const onSearchAreaSelectRef = useRef(onSearchAreaSelect);
+  const hasCenteredOnGpsRef = useRef(false);
 
   useEffect(() => {
     isSelectingRef.current = isSelecting;
   }, [isSelecting]);
 
   useEffect(() => {
-    selectedAreaRef.current = selectedArea;
-  }, [selectedArea]);
-
-  useEffect(() => {
     onSearchAreaSelectRef.current = onSearchAreaSelect;
   }, [onSearchAreaSelect]);
-
-  // Manage cursor and drag panning mode when selection mode toggles
-  useEffect(() => {
-    if (!map.current) return;
-
-    if (isSelecting) {
-      map.current.dragPan.disable();
-      map.current.boxZoom.disable();
-      map.current.getCanvas().style.cursor = "crosshair";
-    } else {
-      map.current.dragPan.enable();
-      map.current.boxZoom.enable();
-      map.current.getCanvas().style.cursor = "";
-    }
-  }, [isSelecting]);
 
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
@@ -119,6 +131,10 @@ export default function SarasMap({
       typeof longitude === "number" &&
       Number.isFinite(latitude) &&
       Number.isFinite(longitude);
+
+    if (hasInitialCoords) {
+      hasCenteredOnGpsRef.current = true;
+    }
 
     const initialLatitude = hasInitialCoords ? latitude : 22.5726;
     const initialLongitude = hasInitialCoords ? longitude : 88.3639;
@@ -148,11 +164,15 @@ export default function SarasMap({
     });
 
     map.current = mapInstance;
-
+    if (typeof window !== "undefined") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any)._map = mapInstance;
+    }
     mapInstance.addControl(new maplibregl.NavigationControl(), "top-right");
 
     mapInstance.on("load", () => {
       console.log("SARAS MAP LOADED");
+      applyTerraDrawLayerStyles(mapInstance);
 
       if (!mapContainer.current || !map.current) return;
 
@@ -164,237 +184,179 @@ export default function SarasMap({
           .setLngLat([initialLongitude, initialLatitude])
           .addTo(map.current);
       }
-
-      // Search area GeoJSON source
-      if (!mapInstance.getSource(SOURCE_ID)) {
-        mapInstance.addSource(SOURCE_ID, {
-          type: "geojson",
-          data: {
-            type: "FeatureCollection",
-            features: [],
-          },
-        });
-
-        // Semi-transparent tactical cyan fill
-        mapInstance.addLayer({
-          id: LAYER_FILL_ID,
-          type: "fill",
-          source: SOURCE_ID,
-          paint: {
-            "fill-color": "#06b6d4",
-            "fill-opacity": 0.22,
-          },
-        });
-
-        // Bright tactical cyan dashed boundary
-        mapInstance.addLayer({
-          id: LAYER_STROKE_ID,
-          type: "line",
-          source: SOURCE_ID,
-          paint: {
-            "line-color": "#22d3ee",
-            "line-width": 2,
-            "line-dasharray": [2, 1],
-          },
-        });
-      }
     });
 
-    const onMouseDown = (
-      e: maplibregl.MapMouseEvent & { originalEvent: MouseEvent }
-    ) => {
-      if (!isSelectingRef.current) return;
-      if (e.originalEvent.button !== 0) return;
-
-      // Robustness: Ignore clicks targeting controls or UI buttons
-      const target = e.originalEvent.target as HTMLElement | null;
-      if (target && target.closest(".maplibregl-ctrl, button, .saras-map-ui")) {
-        return;
-      }
-
-      dragStartLngLatRef.current = e.lngLat;
-      dragStartPointRef.current = e.point;
-      lastMoveLngLatRef.current = e.lngLat;
-      lastMovePointRef.current = e.point;
-      isDraggingRef.current = true;
-      e.originalEvent.preventDefault();
-    };
-
-    const onMouseMove = (e: maplibregl.MapMouseEvent) => {
-      if (
-        !isSelectingRef.current ||
-        !isDraggingRef.current ||
-        !dragStartLngLatRef.current
-      ) {
-        return;
-      }
-
-      lastMoveLngLatRef.current = e.lngLat;
-      lastMovePointRef.current = e.point;
-
-      const rect = buildRectanglePolygon(dragStartLngLatRef.current, e.lngLat);
-      const source = map.current?.getSource(
-        SOURCE_ID
-      ) as maplibregl.GeoJSONSource | undefined;
-
-      if (source) {
-        source.setData({
-          type: "FeatureCollection",
-          features: [
-            {
-              type: "Feature",
-              properties: {},
-              geometry: {
-                type: "Polygon",
-                coordinates: rect.coordinates,
+    // Configure Terra Draw with preferred SARAS styling:
+    // fill #ef4444 (opacity 0.22), boundary #dc2626 (width 3)
+    const drawControl = new MaplibreTerradrawControl({
+      modes: ["rectangle", "select", "delete-selection", "delete"],
+      open: false,
+      modeOptions: {
+        rectangle: new TerraDrawRectangleMode({
+          drawInteraction: "click-drag",
+          styles: {
+            fillColor: "#ef4444",
+            fillOpacity: 0.22,
+            outlineColor: "#dc2626",
+            outlineWidth: 3,
+            outlineOpacity: 1,
+          },
+        }),
+        select: new TerraDrawSelectMode({
+          flags: {
+            rectangle: {
+              feature: {
+                draggable: true,
+                rotateable: false,
+                scaleable: true,
+                coordinates: {
+                  midpoints: false,
+                  draggable: true,
+                  deletable: false,
+                },
               },
             },
-          ],
-        });
-      }
-    };
+          },
+          styles: {
+            selectedPolygonColor: "#ef4444",
+            selectedPolygonFillOpacity: 0.22,
+            selectedPolygonOutlineColor: "#dc2626",
+            selectedPolygonOutlineWidth: 3,
+            selectedPolygonOutlineOpacity: 1,
+          },
+        }),
+      },
+    });
 
-    const finalizeSelection = (
-      endLngLat: maplibregl.LngLat,
-      endPoint: maplibregl.Point
-    ) => {
-      if (
-        !isDraggingRef.current ||
-        !dragStartLngLatRef.current ||
-        !dragStartPointRef.current
-      ) {
-        return;
-      }
+    mapInstance.addControl(drawControl, "top-left");
+    drawControlRef.current = drawControl;
 
-      const dx = endPoint.x - dragStartPointRef.current.x;
-      const dy = endPoint.y - dragStartPointRef.current.y;
-      const pixelDist = Math.hypot(dx, dy);
+    // Hide default Terra Draw toolbar buttons so only SARAS UI buttons control drawing
+    const ctrlEl = (drawControl as unknown as { controlContainer?: HTMLElement }).controlContainer;
+    if (ctrlEl) {
+      ctrlEl.style.display = "none";
+    }
 
-      isDraggingRef.current = false;
+    const td = drawControl.getTerraDrawInstance();
+    if (typeof window !== "undefined") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any)._td = td;
+    }
+    if (td) {
+      td.on("finish", (id) => {
+        map.current?.dragPan.enable();
+        map.current?.boxZoom.enable();
 
-      // Guard against accidental micro-clicks (< 8px)
-      if (pixelDist < 8) {
-        const source = map.current?.getSource(
-          SOURCE_ID
-        ) as maplibregl.GeoJSONSource | undefined;
-        if (source) {
-          if (selectedAreaRef.current) {
-            const existingPoly = polygon([
-              [
-                [selectedAreaRef.current.west, selectedAreaRef.current.south],
-                [selectedAreaRef.current.east, selectedAreaRef.current.south],
-                [selectedAreaRef.current.east, selectedAreaRef.current.north],
-                [selectedAreaRef.current.west, selectedAreaRef.current.north],
-                [selectedAreaRef.current.west, selectedAreaRef.current.south],
-              ],
-            ]);
-            source.setData({
-              type: "FeatureCollection",
-              features: [existingPoly],
-            });
-          } else {
-            source.setData({
-              type: "FeatureCollection",
-              features: [],
-            });
+        const snapshot = td.getSnapshot() as Feature[];
+        const currentFeature =
+          snapshot.find((f) => f.id === id) || snapshot[snapshot.length - 1];
+        if (!currentFeature) return;
+
+        // Single search area rule: replace any older rectangles
+        const olderIds = snapshot
+          .filter((f) => f.id !== currentFeature.id && f.id !== undefined)
+          .map((f) => f.id as string | number);
+        if (olderIds.length > 0) {
+          td.removeFeatures(olderIds);
+        }
+
+        const areaInfo = parseSearchAreaFromFeature(currentFeature);
+        if (areaInfo) {
+          setSelectedArea(areaInfo);
+          setIsSelecting(false);
+          onSearchAreaSelectRef.current?.(areaInfo);
+          // Switch to select mode to keep rectangle visible and editable
+          td.setMode("select");
+          applyTerraDrawLayerStyles(map.current);
+          map.current?.triggerRepaint();
+        } else {
+          td.removeFeatures([currentFeature.id as string | number]);
+        }
+
+
+        // ==========================================
+        // TEMPORARY RUNTIME DIAGNOSTIC INSPECTION
+        // ==========================================
+        try {
+          const m = map.current;
+          if (m) {
+            const src = m.getSource("td-polygon");
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const srcData = src ? (src as any)._data : undefined;
+            const polyLayer = m.getLayer("td-polygon");
+            const outlineLayer = m.getLayer("td-polygon-outline");
+            const fillColor = m.getPaintProperty("td-polygon", "fill-color");
+            const fillOpacity = m.getPaintProperty("td-polygon", "fill-opacity");
+            const outlineColor = m.getPaintProperty("td-polygon-outline", "line-color");
+            const outlineWidth = m.getPaintProperty("td-polygon-outline", "line-width");
+            const outlineOpacity = m.getPaintProperty("td-polygon-outline", "line-opacity");
+            const snap = td.getSnapshot();
+            const mode = td.getMode();
+            const layers = m.getStyle().layers;
+            const layerIds = layers.map((l) => l.id);
+            const osmIndex = layerIds.indexOf("osm");
+            const tdPolyIndex = layerIds.indexOf("td-polygon");
+            const tdOutlineIndex = layerIds.indexOf("td-polygon-outline");
+
+            const diagResult = {
+              1: { sourceExists: !!src },
+              2: { sourceData: srcData },
+              3: { polyLayer: !!polyLayer, outlineLayer: !!outlineLayer },
+              4: { fillColor, fillOpacity, outlineColor, outlineWidth, outlineOpacity },
+              5: { snapshotLength: snap.length, snapshot: snap },
+              6: { mode },
+              7: { currentFeature },
+              8: { layerIds },
+              9: { osmIndex, tdPolyIndex, tdOutlineIndex },
+            };
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (window as any).__SARAS_DIAGNOSTICS__ = diagResult;
+            console.log("=== SARAS RUNTIME DIAGNOSTICS ===", JSON.stringify(diagResult, null, 2));
+          }
+        } catch (diagErr) {
+          console.error("Diagnostic error:", diagErr);
+        }
+      });
+
+
+
+      td.on("change", (ids, type) => {
+        if (type === "update") {
+          applyTerraDrawLayerStyles(map.current);
+          map.current?.triggerRepaint();
+          const snapshot = td.getSnapshot() as Feature[];
+          const updated = snapshot.find((f) => f.id !== undefined && ids.includes(f.id as string | number));
+          if (updated) {
+            const areaInfo = parseSearchAreaFromFeature(updated);
+            if (areaInfo) {
+              setSelectedArea(areaInfo);
+              onSearchAreaSelectRef.current?.(areaInfo);
+            }
+          }
+        } else if (type === "delete") {
+          const snapshot = td.getSnapshot();
+          if (snapshot.length === 0) {
+            setSelectedArea(null);
+            setIsSelecting(false);
+            onSearchAreaSelectRef.current?.(null);
           }
         }
-        return;
-      }
-
-      const rect = buildRectanglePolygon(dragStartLngLatRef.current, endLngLat);
-
-      // Structure: [south-west, south-east, north-east, north-west]
-      const boundary: [
-        SearchAreaBoundaryPoint,
-        SearchAreaBoundaryPoint,
-        SearchAreaBoundaryPoint,
-        SearchAreaBoundaryPoint
-      ] = [
-        { latitude: rect.south, longitude: rect.west },
-        { latitude: rect.south, longitude: rect.east },
-        { latitude: rect.north, longitude: rect.east },
-        { latitude: rect.north, longitude: rect.west },
-      ];
-
-      // Use @turf/turf for accurate geodesic geographic measurements
-      const polyFeature = polygon(rect.coordinates);
-      const widthM = distance(
-        [rect.west, rect.south],
-        [rect.east, rect.south],
-        { units: "meters" }
-      );
-      const heightM = distance(
-        [rect.west, rect.south],
-        [rect.west, rect.north],
-        { units: "meters" }
-      );
-      const areaM2 = area(polyFeature);
-
-      const areaInfo: SearchAreaInfo = {
-        boundary,
-        north: rect.north,
-        south: rect.south,
-        east: rect.east,
-        west: rect.west,
-        widthMeters: Math.round(widthM * 100) / 100,
-        heightMeters: Math.round(heightM * 100) / 100,
-        areaSquareMeters: Math.round(areaM2 * 100) / 100,
-      };
-
-      // Retain finalized rectangle on the map
-      const source = map.current?.getSource(
-        SOURCE_ID
-      ) as maplibregl.GeoJSONSource | undefined;
-      if (source) {
-        source.setData({
-          type: "FeatureCollection",
-          features: [
-            {
-              type: "Feature",
-              properties: {},
-              geometry: {
-                type: "Polygon",
-                coordinates: rect.coordinates,
-              },
-            },
-          ],
-        });
-      }
-
-      selectedAreaRef.current = areaInfo;
-      setSelectedArea(areaInfo);
-      setIsSelecting(false);
-      dragStartLngLatRef.current = null;
-      dragStartPointRef.current = null;
-
-      onSearchAreaSelectRef.current?.(areaInfo);
-    };
-
-    const onMouseUp = (e: maplibregl.MapMouseEvent) => {
-      finalizeSelection(e.lngLat, e.point);
-    };
-
-    const onWindowMouseUp = () => {
-      if (
-        isDraggingRef.current &&
-        lastMoveLngLatRef.current &&
-        lastMovePointRef.current
-      ) {
-        finalizeSelection(
-          lastMoveLngLatRef.current,
-          lastMovePointRef.current
-        );
-      }
-    };
-
-    mapInstance.on("mousedown", onMouseDown);
-    mapInstance.on("mousemove", onMouseMove);
-    mapInstance.on("mouseup", onMouseUp);
-    window.addEventListener("mouseup", onWindowMouseUp);
+      });
+    }
 
     return () => {
-      window.removeEventListener("mouseup", onWindowMouseUp);
+      map.current?.dragPan.enable();
+      map.current?.boxZoom.enable();
+
+      if (drawControlRef.current && map.current) {
+        try {
+          map.current.removeControl(drawControlRef.current);
+        } catch {
+          // Ignore control removal error during unmount
+        }
+        drawControlRef.current = null;
+      }
 
       marker.current?.remove();
       marker.current = null;
@@ -435,75 +397,71 @@ export default function SarasMap({
       marker.current.setLngLat(newPosition);
     }
 
-    map.current.flyTo({
-      center: newPosition,
-      duration: 800,
-    });
-  }, [latitude, longitude]);
-
-  const handleStartSelection = () => {
-    setIsSelecting(true);
-  };
-
-  const handleCancelSelection = () => {
-    setIsSelecting(false);
-    isDraggingRef.current = false;
-    dragStartLngLatRef.current = null;
-    dragStartPointRef.current = null;
-
-    const source = map.current?.getSource(
-      SOURCE_ID
-    ) as maplibregl.GeoJSONSource | undefined;
-    if (source) {
-      if (selectedAreaRef.current) {
-        const poly = polygon([
-          [
-            [selectedAreaRef.current.west, selectedAreaRef.current.south],
-            [selectedAreaRef.current.east, selectedAreaRef.current.south],
-            [selectedAreaRef.current.east, selectedAreaRef.current.north],
-            [selectedAreaRef.current.west, selectedAreaRef.current.north],
-            [selectedAreaRef.current.west, selectedAreaRef.current.south],
-          ],
-        ]);
-        source.setData({
-          type: "FeatureCollection",
-          features: [poly],
-        });
-      } else {
-        source.setData({
-          type: "FeatureCollection",
-          features: [],
+    // Center map only once on the first valid GPS fix without interrupting manual pan/zoom
+    if (!hasCenteredOnGpsRef.current) {
+      hasCenteredOnGpsRef.current = true;
+      if (!isSelectingRef.current) {
+        map.current.easeTo({
+          center: newPosition,
+          duration: 600,
         });
       }
     }
+  }, [latitude, longitude]);
+
+  const handleStartSelection = () => {
+    map.current?.dragPan.disable();
+    map.current?.boxZoom.disable();
+    const td = drawControlRef.current?.getTerraDrawInstance();
+    if (td) {
+      if (!td.enabled) {
+        td.start();
+      }
+      td.clear();
+      td.setMode("rectangle");
+      applyTerraDrawLayerStyles(map.current);
+    }
+    setSelectedArea(null);
+    setIsSelecting(true);
+    onSearchAreaSelectRef.current?.(null);
+  };
+
+
+  const handleCancelSelection = () => {
+    map.current?.dragPan.enable();
+    map.current?.boxZoom.enable();
+    const td = drawControlRef.current?.getTerraDrawInstance();
+    if (td) {
+      td.clear();
+      td.setMode("select");
+    }
+    setSelectedArea(null);
+    setIsSelecting(false);
+    onSearchAreaSelectRef.current?.(null);
   };
 
   const handleClearArea = () => {
-    const source = map.current?.getSource(
-      SOURCE_ID
-    ) as maplibregl.GeoJSONSource | undefined;
-    if (source) {
-      source.setData({
-        type: "FeatureCollection",
-        features: [],
-      });
+    map.current?.dragPan.enable();
+    map.current?.boxZoom.enable();
+    const td = drawControlRef.current?.getTerraDrawInstance();
+    if (td) {
+      td.clear();
+      td.setMode("select");
     }
-
-    selectedAreaRef.current = null;
     setSelectedArea(null);
     setIsSelecting(false);
-    isDraggingRef.current = false;
-    dragStartLngLatRef.current = null;
-    dragStartPointRef.current = null;
-
-    if (map.current) {
-      map.current.dragPan.enable();
-      map.current.boxZoom.enable();
-      map.current.getCanvas().style.cursor = "";
-    }
-
     onSearchAreaSelectRef.current?.(null);
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isSelecting) {
+        handleCancelSelection();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isSelecting]);
 
   return (
     <div className="relative h-full w-full min-h-[480px]">
@@ -534,7 +492,7 @@ export default function SarasMap({
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 rounded-lg border border-cyan-400/70 bg-cyan-950/80 px-3 py-2 text-xs font-semibold text-cyan-300 shadow-xl backdrop-blur-md">
               <SquareDashed size={14} className="animate-pulse text-cyan-400" />
-              <span>Click &amp; drag on map</span>
+              <span>Drawing... (drag on map)</span>
             </div>
 
             <button

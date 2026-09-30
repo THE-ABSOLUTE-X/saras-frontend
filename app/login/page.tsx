@@ -1,171 +1,133 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Radio, AlertCircle, Loader2, ArrowRight } from "lucide-react";
+import { authService } from "@/services/authService";
+import { apiService } from "@/services/apiService";
 
 export default function LoginPage() {
   const router = useRouter();
 
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("admin");
+  const [password, setPassword] = useState("saras123");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
 
-  const handleLogin = (e: FormEvent<HTMLFormElement>) => {
+  // Auto-redirect if already authenticated
+  useEffect(() => {
+    if (authService.isAuthenticated()) {
+      router.replace("/dashboard");
+    }
+
+    // Quick backend connectivity probe
+    apiService
+      .fetchRobotState("SARAS-01")
+      .then((res) => {
+        setBackendOnline(res !== null);
+      })
+      .catch(() => {
+        setBackendOnline(false);
+      });
+  }, [router]);
+
+  const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
     setError("");
     setLoading(true);
 
-    // Demo credentials for SARAS MVP
-    const validUsername = "admin";
-    const validPassword = "saras123";
-
-    if (username === validUsername && password === validPassword) {
-      // Store simple login state for the MVP
-      sessionStorage.setItem("saras_authenticated", "true");
-
+    const res = await authService.login(username, password);
+    if (res.success) {
       router.push("/dashboard");
     } else {
-      setError("Invalid username or password.");
+      setError(res.error || "Authentication failed.");
       setLoading(false);
     }
   };
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background:
-          "radial-gradient(circle at top, #172554 0%, #020617 45%, #000000 100%)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "24px",
-        color: "white",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "420px",
-        }}
-      >
+    <main className="min-h-screen bg-radial from-[#172554] via-[#020617] to-black flex items-center justify-center p-4 text-white">
+      <div className="w-full max-w-md">
         {/* SARAS Branding */}
-        <div
-          style={{
-            textAlign: "center",
-            marginBottom: "28px",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "13px",
-              letterSpacing: "7px",
-              color: "#22d3ee",
-              fontWeight: 700,
-              marginBottom: "8px",
-            }}
-          >
-            S A R A S
+        <div className="text-center mb-8">
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 shadow-lg shadow-cyan-500/20">
+            <Radio size={28} className="animate-pulse" />
           </div>
 
-          <div
-            style={{
-              fontSize: "14px",
-              color: "#94a3b8",
-              letterSpacing: "1px",
-            }}
-          >
-            SEARCH & RESCUE AUTONOMOUS SYSTEM
+          <div className="text-xs font-mono font-bold tracking-[0.4em] text-cyan-400 uppercase">
+            SARAS COMMAND CENTER
           </div>
+
+          <h1 className="text-2xl font-black tracking-tight text-white mt-1">
+            Search & Rescue Automated System
+          </h1>
+
+          <p className="text-xs text-slate-400 mt-1 font-mono">
+            SIH 2026 • Robotics Mission Operations
+          </p>
         </div>
 
         {/* Login Card */}
-        <div
-          style={{
-            background: "rgba(15, 23, 42, 0.96)",
-            border: "1px solid rgba(71, 85, 105, 0.5)",
-            borderRadius: "18px",
-            padding: "34px",
-            boxShadow: "0 25px 70px rgba(0, 0, 0, 0.45)",
-          }}
-        >
-          <div style={{ marginBottom: "26px" }}>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: "28px",
-                fontWeight: 700,
-              }}
-            >
-              Operator Login
-            </h1>
+        <div className="rounded-2xl border border-slate-800 bg-[#0B1222]/90 p-8 shadow-2xl backdrop-blur-xl">
+          <div className="mb-6 flex items-center justify-between border-b border-slate-800/80 pb-4">
+            <div>
+              <h2 className="text-lg font-bold text-white">Operator Sign In</h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Authenticate mission control console session
+              </p>
+            </div>
 
-            <p
-              style={{
-                marginTop: "8px",
-                marginBottom: 0,
-                color: "#94a3b8",
-                fontSize: "14px",
-              }}
-            >
-              Sign in to access the SARAS operator center.
-            </p>
+            {/* Backend connection pill */}
+            <div className="flex items-center gap-1.5 rounded-full border border-slate-800 bg-[#070D1C] px-2.5 py-1 text-[10px] font-mono">
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  backendOnline === true
+                    ? "bg-green-400 animate-pulse"
+                    : backendOnline === false
+                      ? "bg-amber-400"
+                      : "bg-slate-500"
+                }`}
+              />
+              <span className="text-slate-400">
+                {backendOnline === true
+                  ? "BACKEND LIVE"
+                  : backendOnline === false
+                    ? "LOCAL DEV"
+                    : "CHECKING"}
+              </span>
+            </div>
           </div>
 
-          <form onSubmit={handleLogin}>
+          <form onSubmit={handleLogin} className="space-y-4">
             {/* Username */}
-            <div style={{ marginBottom: "18px" }}>
+            <div>
               <label
                 htmlFor="username"
-                style={{
-                  display: "block",
-                  marginBottom: "8px",
-                  fontSize: "14px",
-                  color: "#cbd5e1",
-                }}
+                className="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-1.5"
               >
-                Username
+                Operator ID / Username
               </label>
-
               <input
                 id="username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter username"
+                placeholder="Enter operator username"
                 autoComplete="username"
                 required
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  padding: "13px 14px",
-                  borderRadius: "10px",
-                  border: "1px solid #334155",
-                  background: "#020617",
-                  color: "white",
-                  outline: "none",
-                  fontSize: "15px",
-                }}
+                className="w-full rounded-xl border border-slate-800 bg-[#070D1C] px-4 py-3 text-sm text-white placeholder-slate-600 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 font-mono transition"
               />
             </div>
 
             {/* Password */}
-            <div style={{ marginBottom: "18px" }}>
+            <div>
               <label
                 htmlFor="password"
-                style={{
-                  display: "block",
-                  marginBottom: "8px",
-                  fontSize: "14px",
-                  color: "#cbd5e1",
-                }}
+                className="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-1.5"
               >
-                Password
+                Security Passcode
               </label>
-
               <input
                 id="password"
                 type="password"
@@ -174,101 +136,58 @@ export default function LoginPage() {
                 placeholder="Enter password"
                 autoComplete="current-password"
                 required
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  padding: "13px 14px",
-                  borderRadius: "10px",
-                  border: "1px solid #334155",
-                  background: "#020617",
-                  color: "white",
-                  outline: "none",
-                  fontSize: "15px",
-                }}
+                className="w-full rounded-xl border border-slate-800 bg-[#070D1C] px-4 py-3 text-sm text-white placeholder-slate-600 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 font-mono transition"
               />
             </div>
 
-            {/* Error */}
+            {/* Error Message */}
             {error && (
-              <div
-                style={{
-                  marginBottom: "18px",
-                  padding: "11px 12px",
-                  borderRadius: "9px",
-                  background: "rgba(127, 29, 29, 0.3)",
-                  border: "1px solid rgba(239, 68, 68, 0.4)",
-                  color: "#fca5a5",
-                  fontSize: "13px",
-                }}
-              >
-                {error}
+              <div className="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
+                <AlertCircle size={15} className="shrink-0 text-red-400" />
+                <span>{error}</span>
               </div>
             )}
 
-            {/* Login Button */}
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
-              style={{
-                width: "100%",
-                padding: "14px",
-                border: "none",
-                borderRadius: "10px",
-                background: loading ? "#475569" : "#06b6d4",
-                color: "#ffffff",
-                fontSize: "15px",
-                fontWeight: 700,
-                cursor: loading ? "not-allowed" : "pointer",
-                transition: "0.2s",
-              }}
+              className="w-full rounded-xl bg-cyan-500 py-3 text-sm font-bold text-black shadow-lg shadow-cyan-500/25 hover:bg-cyan-400 active:scale-[0.99] transition flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
             >
-              {loading ? "Signing in..." : "Sign In"}
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin text-black" />
+                  <span>Authorizing Console...</span>
+                </>
+              ) : (
+                <>
+                  <span>Access SARAS Operations</span>
+                  <ArrowRight size={16} />
+                </>
+              )}
             </button>
           </form>
 
-          {/* Demo credentials */}
-          <div
-            style={{
-              marginTop: "22px",
-              paddingTop: "18px",
-              borderTop: "1px solid #1e293b",
-              textAlign: "center",
-            }}
-          >
-            <div
-              style={{
-                fontSize: "12px",
-                color: "#64748b",
-                marginBottom: "6px",
-              }}
-            >
-              SARAS MVP Demo Access
-            </div>
-
-            <div
-              style={{
-                fontSize: "12px",
-                color: "#94a3b8",
-              }}
-            >
-              Username: <strong style={{ color: "#cbd5e1" }}>admin</strong>
-              {"  •  "}
-              Password:{" "}
-              <strong style={{ color: "#cbd5e1" }}>saras123</strong>
+          {/* Demo Credentials Box */}
+          <div className="mt-6 pt-5 border-t border-slate-800/80 text-center font-mono">
+            <span className="text-[11px] text-slate-500 uppercase tracking-wider block mb-1">
+              Field Demo Credentials
+            </span>
+            <div className="inline-flex items-center gap-3 rounded-lg border border-slate-800 bg-[#070D1C] px-3 py-1.5 text-xs text-slate-300">
+              <span>
+                User: <strong className="text-cyan-400">admin</strong>
+              </span>
+              <span className="text-slate-600">•</span>
+              <span>
+                Pass: <strong className="text-cyan-400">saras123</strong>
+              </span>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            textAlign: "center",
-            marginTop: "22px",
-            fontSize: "11px",
-            color: "#475569",
-          }}
-        >
-          SARAS-01 • Operator Control System
+        <div className="mt-6 text-center text-[11px] font-mono text-slate-500">
+          SARAS-01 • Autonomous Rescue Robotics Station
         </div>
       </div>
     </main>
