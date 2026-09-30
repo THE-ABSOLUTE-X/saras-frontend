@@ -74,7 +74,7 @@ export default function ControlPage() {
       }
 
       if (dir === "STOP") {
-        sendDriveFrame("STOP", 0);
+        sendDriveFrame("STOP", speedRef.current);
         return;
       }
 

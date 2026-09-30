@@ -6,6 +6,59 @@ export type RobotStatus =
   | "stopped"
   | "offline";
 
+export interface BatteryTelemetry {
+  percentage?: number | null;
+  voltage?: number | null;
+  status?: string | null;
+}
+
+export interface MotionTelemetry {
+  state?: string | null;
+}
+
+export interface SafetyTelemetry {
+  state?: string | null;
+  obstacle_detected?: boolean | null;
+  emergency_stop?: boolean | null;
+  front_distance_cm?: number | null;
+}
+
+export interface ObstacleAvoidanceTelemetry {
+  mode?: string | null;
+}
+
+export interface EnvironmentTelemetry {
+  temperature_c?: number | null;
+  humidity_percent?: number | null;
+  mq7_analog?: number | null;
+  mq7_digital?: number | boolean | null;
+  flame_detected?: boolean | null;
+}
+
+export interface ImuAcceleration {
+  x_g?: number | null;
+  y_g?: number | null;
+  z_g?: number | null;
+}
+
+export interface ImuGyroscope {
+  x_dps?: number | null;
+  y_dps?: number | null;
+  z_dps?: number | null;
+}
+
+export interface ImuOrientation {
+  roll_deg?: number | null;
+  pitch_deg?: number | null;
+}
+
+export interface ImuTelemetry {
+  acceleration?: ImuAcceleration | null;
+  gyroscope?: ImuGyroscope | null;
+  orientation?: ImuOrientation | null;
+  temperature_c?: number | null;
+}
+
 export interface TelemetryData {
   timestamp: string | null;
   latitude: number | null;
@@ -36,6 +89,14 @@ export interface TelemetryData {
   emergencyStop?: boolean | null;
   motionState?: string | null;
   obstacleMode?: string | null;
+
+  // Canonical structured sub-models (exact parity with backend Telemetry)
+  battery?: BatteryTelemetry | null;
+  motion?: MotionTelemetry | null;
+  safety?: SafetyTelemetry | null;
+  obstacle_avoidance?: ObstacleAvoidanceTelemetry | null;
+  environment?: EnvironmentTelemetry | null;
+  imu?: ImuTelemetry | null;
 }
 
 export interface PhoneTelemetryData {
